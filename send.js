@@ -2,13 +2,14 @@ var amqp = require("amqplib/callback_api");
 
 amqp.connect("amqp://localhost", (err, conn) => {
   conn.createChannel((err, ch) => {
-    var q = "task_queue";
+    var ex = "logs";
     var msg = process.argv.slice(2).join(" ") || "Hello World!";
 
-    ch.assertQueue(q, { durable: true });
-    ch.sendToQueue(q, new Buffer.from(msg), { persistent: true });
-    console.log(" [x] Sent '%s'", msg);
+    ch.assertExchange(ex, "fanout", { durable: false });
+    ch.publish(ex, "", new Buffer.from(msg));
+    console.log(" [x] Sent %s", msg);
   });
+
   setTimeout(() => {
     conn.close();
     process.exit(0);
