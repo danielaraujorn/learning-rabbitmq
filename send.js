@@ -2,12 +2,14 @@ var amqp = require("amqplib/callback_api");
 
 amqp.connect("amqp://localhost", (err, conn) => {
   conn.createChannel((err, ch) => {
-    var ex = "logs";
-    var msg = process.argv.slice(2).join(" ") || "Hello World!";
+    var ex = "direct_logs";
+    var args = process.argv.slice(2);
+    var msg = args.slice(1).join(" ") || "Hello World!";
+    var severity = args.length > 0 ? args[0] : "info";
 
-    ch.assertExchange(ex, "fanout", { durable: false });
-    ch.publish(ex, "", new Buffer.from(msg));
-    console.log(" [x] Sent %s", msg);
+    ch.assertExchange(ex, "direct", { durable: false });
+    ch.publish(ex, severity, new Buffer.from(msg));
+    console.log(" [x] Sent %s: '%s'", severity, msg);
   });
 
   setTimeout(() => {
