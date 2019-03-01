@@ -1,19 +1,46 @@
 var amqp = require("amqplib/callback_api");
 
-amqp.connect("amqp://localhost", (err, conn) => {
+var args = process.argv.slice(2);
+
+if (args.length == 0) {
+  console.log("Usage: rpc_client.js num");
+  process.exit(1);
+}
+
+amqp.connect("amqp://user:bitnami@localhost", (err, conn) => {
   conn.createChannel((err, ch) => {
-    var ex = "direct_logs";
-    var args = process.argv.slice(2);
-    var msg = args.slice(1).join(" ") || "Hello World!";
-    var severity = args.length > 0 ? args[0] : "info";
+    ch.assertQueue("", { exclusive: true }, (err, q) => {
+      var corr = generateUuid();
+      var num = parseInt(args[0]);
 
-    ch.assertExchange(ex, "direct", { durable: false });
-    ch.publish(ex, severity, new Buffer.from(msg));
-    console.log(" [x] Sent %s: '%s'", severity, msg);
+      console.log(" [x] Requesting fib(%d)", num);
+
+      ch.consume(
+        q.queue,
+        msg => {
+          if (msg.properties.correlationId == corr) {
+            console.log(" [.] Got %s", msg.content.toString());
+            setTimeout(() => {
+              conn.close();
+              process.exit(0);
+            }, 500);
+          }
+        },
+        { noAck: true }
+      );
+
+      ch.sendToQueue("rpc_queue", new Buffer.from(num.toString()), {
+        correlationId: corr,
+        replyTo: q.queue
+      });
+    });
   });
-
-  setTimeout(() => {
-    conn.close();
-    process.exit(0);
-  }, 500);
 });
+
+const generateUuid = () => {
+  return (
+    Math.random().toString() +
+    Math.random().toString() +
+    Math.random().toString()
+  );
+};
